@@ -3,5 +3,3 @@ twilio
 gunicorn
 oauth2client
 gspread
-unicodedata
-datetime
