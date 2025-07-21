@@ -10,7 +10,7 @@ app = Flask(__name__)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
 client = gspread.authorize(creds)
-sheet = client.open("chatbot whatsapp").sheet1  # Cambiar si la hoja tiene otro nombre
+sheet = client.open("chatbot whatsapp").worksheet("sheet 1")  # Cambiar si la hoja tiene otro nombre
 
 # Diccionario de sesión temporal por número de WhatsApp
 sessions = {}
