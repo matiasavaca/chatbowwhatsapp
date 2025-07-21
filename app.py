@@ -15,7 +15,7 @@ viaje_sheet = client.open("chatbot whatsapp").worksheet("Viaje completo")
 hoteles_sheet = client.open("chatbot whatsapp").worksheet("Hoteles")
 tours_sheet = client.open("chatbot whatsapp").worksheet("tours")
 
-# Sesiones con expiración de 5 minutos
+# Sesiones activas
 sessions = {}  # phone_number: {"data": row, "last_active": datetime, "state": "menu"}
 
 @app.route("/whatsapp", methods=['POST'])
@@ -25,16 +25,19 @@ def whatsapp_reply():
     resp = MessagingResponse()
     msg = resp.message()
     lower_msg = incoming_msg.lower()
+    now = datetime.now()
 
     # Limpiar sesiones inactivas
-    now = datetime.now()
-    if phone_number in sessions and now - sessions[phone_number]["last_active"] > timedelta(minutes=5):
-        del sessions[phone_number]
+    if phone_number in sessions:
+        last_active = sessions[phone_number]["last_active"]
+        if now - last_active > timedelta(minutes=5):
+            del sessions[phone_number]  # expira sesión
 
-    # Login por usuario
+    # Si no hay sesión: pedir usuario
     if phone_number not in sessions:
         username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
+
         for row in all_records:
             usuario = ''.join(str(row.get('usuario', '')).lower().split())
             if username_input == usuario:
@@ -43,17 +46,19 @@ def whatsapp_reply():
                     "last_active": now,
                     "state": "menu"
                 }
-                msg.body(f"👋 ¡Hola {row.get('nombre', '').capitalize()}! Ya estás identificado.\n\nEscribí `menu` para ver tus opciones.")
+                nombre = row.get('nombre', '').capitalize()
+                msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 Escribí `menu` para ver tus opciones.")
                 return str(resp)
-        msg.body("❌ No encontré tu usuario. Asegurate de escribirlo correctamente.")
+
+        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar (sin espacios, ejemplo: `matiasavaca`).")
         return str(resp)
 
-    # Usuario activo
+    # Usuario ya identificado
     sessions[phone_number]["last_active"] = now
     user_data = sessions[phone_number]["data"]
     state = sessions[phone_number]["state"]
 
-    if lower_msg in ['menu', 'volver']:
+    if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
         msg.body("📋 ¿Qué querés consultar?\n1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
