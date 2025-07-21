@@ -47,7 +47,8 @@ def whatsapp_reply():
                     "state": "menu"
                 }
                 nombre = row.get('nombre', '').capitalize()
-                msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 Escribí `menu` para ver tus opciones.")
+                msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 ¿Qué querés consultar?\n"
+                         "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
         msg.body("👤 Por favor escribí tu nombre de usuario para comenzar (sin espacios, ejemplo: `matiasavaca`).")
