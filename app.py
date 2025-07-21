@@ -3,6 +3,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
+import unicodedata
 
 app = Flask(__name__)
 
@@ -18,13 +19,17 @@ tours_sheet = client.open("chatbot whatsapp").worksheet("tours")
 # Sesiones activas
 sessions = {}  # phone_number: {"data": row, "last_active": datetime, "state": "menu"}
 
+# Función para eliminar acentos y normalizar texto
+def normalize(text):
+    return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8').lower().strip()
+
 @app.route("/whatsapp", methods=['POST'])
 def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip()
     phone_number = request.form.get('From')
     resp = MessagingResponse()
     msg = resp.message()
-    lower_msg = incoming_msg.lower()
+    lower_msg = normalize(incoming_msg)
     now = datetime.now()
 
     # Verificar si la sesión ya existe y está activa
@@ -37,6 +42,10 @@ def whatsapp_reply():
 
     # Si no está logueado, tratar de loguear
     if phone_number not in sessions:
+        if lower_msg == '':
+            msg.body("👋 ¡Hola! Por favor escribí tu nombre de usuario para comenzar.")
+            return str(resp)
+
         username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
 
@@ -89,7 +98,7 @@ def whatsapp_reply():
         elif lower_msg in ['4', 'tour', 'tours']:
             paquete = user_data['tipo de paquete'].lower()
             tours = tours_sheet.get_all_records()
-            tours_filtrados = [t for t in tours if t.get('paquete', '').lower() == paquete]
+            tours_filtrados = [t for t in tours if normalize(t.get('paquete', '')) == paquete]
             if tours_filtrados:
                 reply = "🚌 Tours incluidos:\n"
                 for idx, t in enumerate(tours_filtrados, 1):
