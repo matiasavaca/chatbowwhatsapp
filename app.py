@@ -27,13 +27,15 @@ def whatsapp_reply():
     lower_msg = incoming_msg.lower()
     now = datetime.now()
 
-    # Limpiar sesiones inactivas
+    # Verificar si existe sesión previa
     if phone_number in sessions:
         last_active = sessions[phone_number]["last_active"]
-        if now - last_active > timedelta(minutes=5):
-            del sessions[phone_number]  # sesión expirada
+        if now - last_active > timedelta(minutes=4):
+            msg.body("⏳ Tu sesión ha caducado por inactividad. Por favor escribí tu nombre de usuario para comenzar de nuevo.")
+            del sessions[phone_number]
+            return str(resp)
 
-    # Si no hay sesión activa, intentar identificar usuario
+    # Si no hay sesión activa: intentar identificar usuario
     if phone_number not in sessions:
         username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
@@ -51,8 +53,8 @@ def whatsapp_reply():
                          "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
-        # Usuario no válido
-        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar.")
+        # Si no se identificó, pedir usuario
+        msg.body("👋 ¡Hola! Para comenzar, por favor escribí tu nombre de usuario (sin espacios).")
         return str(resp)
 
     # Usuario ya identificado
