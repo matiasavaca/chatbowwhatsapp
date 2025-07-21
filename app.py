@@ -11,13 +11,16 @@ def whatsapp_reply():
     resp = MessagingResponse()
     msg = resp.message()
 
+    # Respuesta por defecto
+    reply = "❓ Sorry, I didn't understand. Please type 'menu' to see the options."
+
     if incoming_msg in ['hi', 'hello', 'hola', 'start', 'menu']:
         reply = ("👋 Welcome! Please choose an option:\n"
                  "1. Hotel 🏨\n"
                  "2. Alojamiento 🛏️\n"
                  "3. Viajes ✈️\n"
                  "4. Paquetes 🧳")
-        print("✅ Enviando respuesta")  # AGREGADO
+        print("✅ Enviando respuesta")
     elif incoming_msg == '1':
         reply = "You selected Hotel 🏨. Please tell us your destination."
     elif incoming_msg == '2':
@@ -26,11 +29,10 @@ def whatsapp_reply():
         reply = "You selected Viajes ✈️. What type of trip are you planning?"
     elif incoming_msg == '4':
         reply = "You selected Paquetes 🧳. Do you want domestic or international?"
-    else:
-        reply = "❓ Sorry, I didn't understand. Please type 'menu' to see the options."
 
     msg.body(reply)
     return str(resp)
+
 
 @app.route("/", methods=["GET"])
 def home():
