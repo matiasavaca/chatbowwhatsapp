@@ -27,12 +27,14 @@ def whatsapp_reply():
     # Paso 1: Si el número no está en sesión, tomamos el mensaje como nombre y apellido
     if phone_number not in sessions:
         try:
-            nombre, apellido = lower_msg.split()
+            username_input = ''.join(lower_msg.split())  # borra espacios y pasa a minúscula
             all_records = sheet.get_all_records()
             for row in all_records:
-                if row['nombre'].lower() == nombre and row['apellido'].lower() == apellido:
+                usuario_sheet = ''.join(str(row.get('usuario', '')).lower().split())  # mismo formato
+                if username_input == usuario_sheet:
                     sessions[phone_number] = row
-                    msg.body(f"👋 ¡Hola {nombre.capitalize()}! Ya estás identificado. Escribí 'menu' para ver tus opciones.")
+                    nombre = row.get('nombre', '').capitalize()
+                    msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado. Escribí 'menu' para ver tus opciones.")
                     return str(resp)
             msg.body("❌ No encontré tus datos. Asegurate de escribir tu nombre y apellido tal como figuran.")
             return str(resp)
