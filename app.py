@@ -7,7 +7,7 @@ import unicodedata
 
 app = Flask(__name__)
 
-# Autenticación con Google Sheets
+# Autenticación Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
 client = gspread.authorize(creds)
@@ -16,10 +16,9 @@ viaje_sheet = client.open("chatbot whatsapp").worksheet("Viaje completo")
 hoteles_sheet = client.open("chatbot whatsapp").worksheet("Hoteles")
 tours_sheet = client.open("chatbot whatsapp").worksheet("tours")
 
-# Sesiones activas
+# Diccionario de sesiones
 sessions = {}  # phone_number: {"data": row, "last_active": datetime, "state": "menu"}
 
-# Función para eliminar acentos y normalizar texto
 def normalize(text):
     return unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('utf-8').lower().strip()
 
@@ -32,7 +31,7 @@ def whatsapp_reply():
     lower_msg = normalize(incoming_msg)
     now = datetime.now()
 
-    # Verificar si la sesión ya existe y está activa
+    # Revisar si sesión está activa
     if phone_number in sessions:
         last_active = sessions[phone_number]["last_active"]
         if now - last_active > timedelta(minutes=4):
@@ -40,45 +39,41 @@ def whatsapp_reply():
             del sessions[phone_number]
             return str(resp)
 
-    # Si no está logueado, tratar de loguear
+    # Si no está logueado, intentar loguear
     if phone_number not in sessions:
-        if lower_msg == '':
-            msg.body("👋 ¡Hola! Por favor escribí tu nombre de usuario para comenzar.")
-            return str(resp)
-
-        username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
-
+        matched_user = None
         for row in all_records:
-            usuario = ''.join(str(row.get('usuario', '')).lower().split())
-            if username_input == usuario:
-                sessions[phone_number] = {
-                    "data": row,
-                    "last_active": now,
-                    "state": "menu"
-                }
-                nombre = row.get('nombre', '').capitalize()
-                msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 ¿Qué querés consultar?\n"
-                         "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
-                return str(resp)
+            usuario = normalize(row.get('usuario', ''))
+            if lower_msg == usuario:
+                matched_user = row
+                break
 
-        # Si no lo encuentra, pedir usuario
-        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar.")
+        if matched_user:
+            sessions[phone_number] = {
+                "data": matched_user,
+                "last_active": now,
+                "state": "menu"
+            }
+            nombre = matched_user.get('nombre', '').capitalize()
+            msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 ¿Qué querés consultar?\n"
+                     "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
+        else:
+            msg.body("👋 ¡Hola! Por favor escribí tu nombre de usuario para comenzar.")
         return str(resp)
 
-    # Usuario ya está logueado
+    # Usuario ya logueado
     sessions[phone_number]["last_active"] = now
     user_data = sessions[phone_number]["data"]
     state = sessions[phone_number]["state"]
 
-    # Si pide el menú explícitamente
+    # Opciones globales
     if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
         msg.body("📋 Tu viaje ya está listo.\n¿Qué deseás saber?\n"
                  "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
 
-    # Estado de navegación principal
     if state == "menu":
         if lower_msg in ['1', 'vuelo']:
             reply = (f"✈️ Tu vuelo sale el {user_data['fecha salida']} a las {user_data['hora vuelo']} desde {user_data['lugar salida']} "
@@ -87,7 +82,7 @@ def whatsapp_reply():
         elif lower_msg in ['2', 'hotel']:
             hotel_nombre = user_data['hotel alojamiento']
             hoteles = hoteles_sheet.get_all_records()
-            hotel_info = next((h for h in hoteles if h['Nombre'].lower() == hotel_nombre.lower()), None)
+            hotel_info = next((h for h in hoteles if normalize(h['Nombre']) == normalize(hotel_nombre)), None)
             if hotel_info:
                 reply = (f"🏨 Hotel: {hotel_info['Nombre']}\n📍 Dirección: {hotel_info['Direccion']}\n"
                          f"🛏️ Comodidades: {hotel_info['Comodidades']}\n💎 Paquete: {hotel_info['Paquete']}")
@@ -96,7 +91,7 @@ def whatsapp_reply():
         elif lower_msg in ['3', 'paquete']:
             reply = f"🎁 Paquete contratado: {user_data['tipo de paquete']} | Alquiler de auto: {user_data['alquiler de auto']}."
         elif lower_msg in ['4', 'tour', 'tours']:
-            paquete = user_data['tipo de paquete'].lower()
+            paquete = normalize(user_data['tipo de paquete'])
             tours = tours_sheet.get_all_records()
             tours_filtrados = [t for t in tours if normalize(t.get('paquete', '')) == paquete]
             if tours_filtrados:
@@ -114,7 +109,6 @@ def whatsapp_reply():
         msg.body(reply)
         return str(resp)
 
-    # Cualquier otro mensaje sin contexto válido
     msg.body("❓ No entendí tu mensaje. Escribí `menu` para comenzar de nuevo.")
     return str(resp)
 
