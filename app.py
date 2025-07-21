@@ -51,7 +51,7 @@ def whatsapp_reply():
                          "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
-        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar (sin espacios, ejemplo: `matiasavaca`).")
+        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar.")
         return str(resp)
 
     # Usuario ya identificado
@@ -61,7 +61,7 @@ def whatsapp_reply():
 
     if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
-        msg.body("📋 ¿Qué querés consultar?\n1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
+        msg.body("📋 Tu viaje ya esta listo!\n Que deseas saber?\n1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
 
     if state == "menu":
