@@ -17,6 +17,7 @@ def whatsapp_reply():
                  "2. Alojamiento 🛏️\n"
                  "3. Viajes ✈️\n"
                  "4. Paquetes 🧳")
+        print("✅ Enviando respuesta")  # AGREGADO
     elif incoming_msg == '1':
         reply = "You selected Hotel 🏨. Please tell us your destination."
     elif incoming_msg == '2':
