@@ -19,7 +19,10 @@ tours_sheet = client.open("chatbot whatsapp").worksheet("tours")
 # Sesiones activas
 sessions = {}  # phone_number: {"data": row, "last_active": datetime, "state": "menu"}
 
+# Función para normalizar texto
 def normalizar(texto):
+    if not texto:
+        return ""
     texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
     return texto.lower().strip()
 
@@ -32,7 +35,7 @@ def whatsapp_reply():
     lower_msg = normalizar(incoming_msg)
     now = datetime.now()
 
-    # Limpiar sesiones inactivas
+    # Chequear si la sesión expiró
     if phone_number in sessions:
         last_active = sessions[phone_number]["last_active"]
         if now - last_active > timedelta(minutes=4):
@@ -40,21 +43,20 @@ def whatsapp_reply():
             del sessions[phone_number]
             return str(resp)
 
-    # Intentar loguear si no hay sesión
+    # Si no está logueado
     if phone_number not in sessions:
-        username_input = ''.join(lower_msg.split())
+        username_input = normalizar(''.join(lower_msg.split()))
         all_records = viaje_sheet.get_all_records()
-
         for row in all_records:
-            usuario = ''.join(str(row.get('usuario', '')).lower().strip().replace(" ", ""))
+            usuario = normalizar(''.join(str(row.get('usuario', '')).split()))
             if username_input == usuario:
                 sessions[phone_number] = {
                     "data": row,
                     "last_active": now,
                     "state": "menu"
                 }
-                nombre = row.get('nombre', '').capitalize()
-                msg.body(f"👋 ¡Hola {nombre if nombre else 'viajero'}! Ya estás identificado.\n\n📋 ¿Qué querés consultar?\n"
+                nombre = row.get('nombre', '').capitalize() or 'viajero'
+                msg.body(f"👋 ¡Hola {nombre}! Ya estás identificado.\n\n📋 ¿Qué querés consultar?\n"
                          "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
@@ -66,23 +68,23 @@ def whatsapp_reply():
     user_data = sessions[phone_number]["data"]
     state = sessions[phone_number]["state"]
 
-    # Palabras clave para volver al menú
+    # Comandos para volver al menú
     if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
         msg.body("📋 Tu viaje ya está listo.\n¿Qué deseás saber?\n"
                  "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
 
-    # Opciones del menú
+    # Menú principal
     if state == "menu":
         if lower_msg in ['1', 'vuelo']:
             reply = (f"✈️ Tu vuelo sale el {user_data['fecha salida']} a las {user_data['hora vuelo']} desde {user_data['lugar salida']} "
                      f"con destino a {user_data['lugar de destino']}. Número: {user_data['numero de vuelo']}.\n"
                      f"Llega el {user_data['fecha llegada']} a las {user_data['hora de llegada']}.")
         elif lower_msg in ['2', 'hotel']:
-            hotel_nombre = user_data['hotel alojamiento']
+            hotel_nombre = user_data.get('hotel alojamiento', '')
             hoteles = hoteles_sheet.get_all_records()
-            hotel_info = next((h for h in hoteles if h['Nombre'].lower().strip() == hotel_nombre.lower().strip()), None)
+            hotel_info = next((h for h in hoteles if normalizar(h['Nombre']) == normalizar(hotel_nombre)), None)
             if hotel_info:
                 reply = (f"🏨 Hotel: {hotel_info['Nombre']}\n📍 Dirección: {hotel_info['Direccion']}\n"
                          f"🛏️ Comodidades: {hotel_info['Comodidades']}\n💎 Paquete: {hotel_info['Paquete']}")
@@ -91,9 +93,9 @@ def whatsapp_reply():
         elif lower_msg in ['3', 'paquete']:
             reply = f"🎁 Paquete contratado: {user_data['tipo de paquete']} | Alquiler de auto: {user_data['alquiler de auto']}."
         elif lower_msg in ['4', 'tour', 'tours']:
-            paquete = user_data['tipo de paquete'].lower().strip()
+            paquete = normalizar(user_data['tipo de paquete'])
             tours = tours_sheet.get_all_records()
-            tours_filtrados = [t for t in tours if t.get('paquete', '').lower().strip() == paquete]
+            tours_filtrados = [t for t in tours if normalizar(t.get('paquete', '')) == paquete]
             if tours_filtrados:
                 reply = "🚌 Tours incluidos:\n"
                 for idx, t in enumerate(tours_filtrados, 1):
@@ -109,7 +111,7 @@ def whatsapp_reply():
         msg.body(reply)
         return str(resp)
 
-    # Default para cualquier estado no reconocido
+    # Default si el estado no coincide
     msg.body("❓ No entendí tu mensaje. Escribí `menu` para comenzar de nuevo.")
     return str(resp)
 
