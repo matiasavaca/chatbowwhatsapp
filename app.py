@@ -31,9 +31,9 @@ def whatsapp_reply():
     if phone_number in sessions:
         last_active = sessions[phone_number]["last_active"]
         if now - last_active > timedelta(minutes=5):
-            del sessions[phone_number]  # expira sesión
+            del sessions[phone_number]  # sesión expirada
 
-    # Si no hay sesión: pedir usuario
+    # Si no hay sesión activa, intentar identificar usuario
     if phone_number not in sessions:
         username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
@@ -51,6 +51,7 @@ def whatsapp_reply():
                          "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
+        # Usuario no válido
         msg.body("👤 Por favor escribí tu nombre de usuario para comenzar.")
         return str(resp)
 
@@ -61,7 +62,8 @@ def whatsapp_reply():
 
     if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
-        msg.body("📋 Tu viaje ya esta listo!\n Que deseas saber?\n1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
+        msg.body("📋 Tu viaje ya está listo.\n¿Qué deseas saber?\n"
+                 "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
 
     if state == "menu":
