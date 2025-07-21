@@ -3,36 +3,44 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 app = Flask(__name__)
 
+# Diccionario para guardar sesiones (por número de teléfono)
+sessions = {}
+
+# Opciones del menú
+opciones = {
+    '1': 'Hotel 🏨',
+    '2': 'Alojamiento 🛏️',
+    '3': 'Viajes ✈️',
+    '4': 'Paquetes 🧳'
+}
+
 @app.route("/whatsapp", methods=['POST'])
 def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip().lower()
-    print(f"🔍 Mensaje recibido: '{incoming_msg}'")  # Debug
+    phone_number = request.form.get('From')
+    print(f"📥 Mensaje de {phone_number}: '{incoming_msg}'")
 
     resp = MessagingResponse()
     msg = resp.message()
 
-    # Respuesta por defecto
-    reply = "❓ Sorry, I didn't understand. Please type 'menu' to see the options."
+    estado_actual = sessions.get(phone_number, {}).get("estado", "")
 
-    if incoming_msg in ['hi', 'hello', 'hola', 'start', 'menu']:
+    # Si el estado es esperando una opción y el mensaje es válido
+    if estado_actual == "esperando_opcion" and incoming_msg in opciones:
+        seleccion = opciones[incoming_msg]
+        reply = f"✅ Has seleccionado: {seleccion}"
+        sessions[phone_number] = {}  # Reseteamos sesión
+    else:
         reply = ("👋 Welcome! Please choose an option:\n"
                  "1. Hotel 🏨\n"
                  "2. Alojamiento 🛏️\n"
                  "3. Viajes ✈️\n"
                  "4. Paquetes 🧳")
-        print("✅ Enviando respuesta")
-    elif incoming_msg == '1':
-        reply = "You selected Hotel 🏨. Please tell us your destination."
-    elif incoming_msg == '2':
-        reply = "You selected Alojamiento 🛏️. Let us know your preferred location."
-    elif incoming_msg == '3':
-        reply = "You selected Viajes ✈️. What type of trip are you planning?"
-    elif incoming_msg == '4':
-        reply = "You selected Paquetes 🧳. Do you want domestic or international?"
+        sessions[phone_number] = {"estado": "esperando_opcion"}
 
+    print("✅ Enviando respuesta")
     msg.body(reply)
     return str(resp)
-
 
 @app.route("/", methods=["GET"])
 def home():
