@@ -6,6 +6,8 @@ app = Flask(__name__)
 @app.route("/whatsapp", methods=['POST'])
 def whatsapp_reply():
     incoming_msg = request.form.get('Body', '').strip().lower()
+    print(f"🔍 Mensaje recibido: '{incoming_msg}'")  # Debug
+
     resp = MessagingResponse()
     msg = resp.message()
 
@@ -24,10 +26,14 @@ def whatsapp_reply():
     elif incoming_msg == '4':
         reply = "You selected Paquetes 🧳. Do you want domestic or international?"
     else:
-        reply = "Sorry, I didn't understand. Please type 'menu' to see the options."
+        reply = "❓ Sorry, I didn't understand. Please type 'menu' to see the options."
 
     msg.body(reply)
     return str(resp)
+
+@app.route("/", methods=["GET"])
+def home():
+    return "Bot de WhatsApp activo ✅", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
