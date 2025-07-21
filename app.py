@@ -27,15 +27,15 @@ def whatsapp_reply():
     lower_msg = incoming_msg.lower()
     now = datetime.now()
 
-    # Verificar si existe sesión previa
+    # Verificar si la sesión ya existe y está activa
     if phone_number in sessions:
         last_active = sessions[phone_number]["last_active"]
         if now - last_active > timedelta(minutes=4):
-            msg.body("⏳ Tu sesión ha caducado por inactividad. Por favor escribí tu nombre de usuario para comenzar de nuevo.")
+            msg.body("⏰ Tu sesión ha expirado por inactividad. Por favor, volvé a escribir tu nombre de usuario para continuar.")
             del sessions[phone_number]
             return str(resp)
 
-    # Si no hay sesión activa: intentar identificar usuario
+    # Si no está logueado, tratar de loguear
     if phone_number not in sessions:
         username_input = ''.join(lower_msg.lower().split())
         all_records = viaje_sheet.get_all_records()
@@ -53,21 +53,23 @@ def whatsapp_reply():
                          "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
                 return str(resp)
 
-        # Si no se identificó, pedir usuario
-        msg.body("👋 ¡Hola! Para comenzar, por favor escribí tu nombre de usuario (sin espacios).")
+        # Si no lo encuentra, pedir usuario
+        msg.body("👤 Por favor escribí tu nombre de usuario para comenzar.")
         return str(resp)
 
-    # Usuario ya identificado
+    # Usuario ya está logueado
     sessions[phone_number]["last_active"] = now
     user_data = sessions[phone_number]["data"]
     state = sessions[phone_number]["state"]
 
+    # Si pide el menú explícitamente
     if lower_msg in ['menu', 'opciones', 'volver', 'start']:
         sessions[phone_number]["state"] = "menu"
-        msg.body("📋 Tu viaje ya está listo.\n¿Qué deseas saber?\n"
+        msg.body("📋 Tu viaje ya está listo.\n¿Qué deseás saber?\n"
                  "1. Vuelo ✈️\n2. Hotel 🏨\n3. Paquete 🎁\n4. Tours 🚌\n\nEscribí el número o palabra clave.")
         return str(resp)
 
+    # Estado de navegación principal
     if state == "menu":
         if lower_msg in ['1', 'vuelo']:
             reply = (f"✈️ Tu vuelo sale el {user_data['fecha salida']} a las {user_data['hora vuelo']} desde {user_data['lugar salida']} "
@@ -87,19 +89,23 @@ def whatsapp_reply():
         elif lower_msg in ['4', 'tour', 'tours']:
             paquete = user_data['tipo de paquete'].lower()
             tours = tours_sheet.get_all_records()
-            tours_filtrados = [t for t in tours if t['paquete'].lower() == paquete]
+            tours_filtrados = [t for t in tours if t.get('paquete', '').lower() == paquete]
             if tours_filtrados:
                 reply = "🚌 Tours incluidos:\n"
-                for t in tours_filtrados:
-                    reply += f"• {t['nombre']}: {t['decripcion']}\n"
+                for idx, t in enumerate(tours_filtrados, 1):
+                    nombre = t.get('nombre', 'Sin nombre')
+                    descripcion = t.get('descripcion', 'Sin descripción')
+                    reply += f"{idx}. {nombre}: {descripcion}\n"
             else:
                 reply = f"❌ No hay tours asignados al paquete {user_data['tipo de paquete']}."
         else:
             reply = "❓ No entendí tu mensaje. Escribí `menu` para ver las opciones."
+
         reply += "\n\n🔙 Escribí `volver` para regresar al menú."
         msg.body(reply)
         return str(resp)
 
+    # Cualquier otro mensaje sin contexto válido
     msg.body("❓ No entendí tu mensaje. Escribí `menu` para comenzar de nuevo.")
     return str(resp)
 
