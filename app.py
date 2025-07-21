@@ -44,7 +44,7 @@ def whatsapp_reply():
             return str(resp)
 
     # Si no está logueado
-    if phone_number not in sessions:
+    if phone_number not in sessions or sessions[phone_number].get("state") != "menu":
         username_input = normalizar(''.join(lower_msg.split()))
         all_records = viaje_sheet.get_all_records()
         for row in all_records:
