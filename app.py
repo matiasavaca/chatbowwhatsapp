@@ -68,7 +68,7 @@ def whatsapp_reply():
 
     elif estado == 'menu':
         user_data = sesiones[from_number]['user_data']
-        paquete = user_data['tipo de paquete'].strip().lower()
+        paquete = user_data['paquete'].strip().lower()
 
         if incoming_msg == '1':
             hotel = user_data['hotel alojamiento']
