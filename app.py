@@ -24,8 +24,7 @@ def mostrar_menu():
             "1. Hotel 🏨\n"
             "2. Alojamiento 🛏️\n"
             "3. Viajes ✈️\n"
-            "4. Paquetes 🧳\n"
-            "5. Volver al menú")
+            "4. Paquetes 🧳\n")
 
 # Ruta principal del bot
 @app.route("/whatsapp", methods=["POST"])
@@ -81,15 +80,19 @@ def whatsapp_reply():
                          f"💎 Paquete: {hotel_info['Paquete']}")
             else:
                 reply = f"❌ No se encontró información del hotel {hotel}."
+            reply += "\n\n↩️ Escribe *5* para volver al menú principal."
 
         elif incoming_msg == '2':
-            reply = f"🛏️ Tu alojamiento es *{user_data['hotel alojamiento']}*, incluido en el paquete *{user_data['tipo de paquete']}*."
+            reply = (f"🛏️ Tu alojamiento es *{user_data['hotel alojamiento']}*, "
+                     f"incluido en el paquete *{user_data['tipo de paquete']}*.")
+            reply += "\n\n↩️ Escribe *5* para volver al menú principal."
 
         elif incoming_msg == '3':
             reply = (f"✈️ *Viaje de {user_data['lugar salida']} a {user_data['lugar de destino']}*\n"
                      f"📅 Salida: {user_data['fecha salida']} a las {user_data['hora vuelo']}\n"
                      f"📅 Llegada: {user_data['fecha llegada']} a las {user_data['hora de llegada']}\n"
                      f"🔢 Vuelo: {user_data['numero de vuelo']}")
+            reply += "\n\n↩️ Escribe *5* para volver al menú principal."
 
         elif incoming_msg == '4':
             tours_data = tours_sheet.get_all_records()
@@ -100,13 +103,13 @@ def whatsapp_reply():
                     reply += f"\n🔹 *{tour['nombre']}*\n{tour['decripcion']}"
             else:
                 reply = "❌ No se encontraron tours para tu paquete."
+            reply += "\n\n↩️ Escribe *5* para volver al menú principal."
 
         elif incoming_msg == '5':
             reply = mostrar_menu()
 
         else:
             reply = "❓ Opción inválida. Por favor escribe un número del 1 al 5."
-
     else:
         reply = "❌ Estado desconocido. Inicia de nuevo escribiendo cualquier mensaje."
 
