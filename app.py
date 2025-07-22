@@ -2,104 +2,116 @@ from flask import Flask, request
 from twilio.twiml.messaging_response import MessagingResponse
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import time
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
-# Conectar a Google Sheets
+# Google Sheets setup
 scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name("/etc/secrets/credentials.json", scope)
 client = gspread.authorize(creds)
 
-# Cargar hojas
 viaje_sheet = client.open("chatbot whatsapp").worksheet("Viaje completo")
 hoteles_sheet = client.open("chatbot whatsapp").worksheet("Hoteles")
 tours_sheet = client.open("chatbot whatsapp").worksheet("tours")
 
-# Guardar sesiones activas (timestamp)
+# Sesiones temporales
 sesiones = {}
-TIMEOUT = 300  # 5 minutos en segundos
 
-@app.route("/whatsapp", methods=['POST'])
+# Helper para mostrar menú
+def mostrar_menu():
+    return ("📋 Elige una opción:\n"
+            "1. Hotel 🏨\n"
+            "2. Alojamiento 🛏️\n"
+            "3. Viajes ✈️\n"
+            "4. Paquetes 🧳\n"
+            "5. Volver al menú")
+
+# Ruta principal del bot
+@app.route("/whatsapp", methods=["POST"])
 def whatsapp_reply():
+    incoming_msg = request.form.get('Body', '').strip().lower()
+    from_number = request.form.get('From')
     resp = MessagingResponse()
     msg = resp.message()
+    now = datetime.now()
 
-    try:
-        incoming_msg = request.form.get('Body', '').strip().lower()
-        from_number = request.form.get('From')
-        username = from_number.split(":")[-1].lower()
-        print(f"\n📩 Mensaje de {username}: '{incoming_msg}'")
+    # Verificamos sesión activa
+    sesion = sesiones.get(from_number)
 
-        # Resetear sesión si pasaron más de 5 minutos
-        now = time.time()
-        if from_number in sesiones and now - sesiones[from_number] > TIMEOUT:
-            print("🕒 Sesión expirada, reiniciando...")
-            del sesiones[from_number]
+    if not sesion or (now - sesion['timestamp']) > timedelta(minutes=5):
+        # Iniciar nueva sesión
+        sesiones[from_number] = {'estado': 'esperando_usuario', 'timestamp': now}
+        reply = "👋 Welcome! Sign in with your *username* to get your trip information:"
+        msg.body(reply)
+        print(f"➡️ Bot: {reply}")
+        return str(resp)
 
-        sesiones[from_number] = now  # Actualiza o crea timestamp de sesión
+    # Actualizamos tiempo de sesión
+    sesiones[from_number]['timestamp'] = now
+    estado = sesiones[from_number]['estado']
 
-        if incoming_msg not in ['1', '2', '3', '4']:
-            reply = ("👋 Welcome! Please choose an option:\n"
-                     "1. Hotel \U0001F3E8\n"
-                     "2. Alojamiento \U0001F6CF\uFE0F\n"
-                     "3. Viajes \u2708\uFE0F\n"
-                     "4. Paquetes \U0001F9F3")
-            msg.body(reply)
-            return str(resp)
+    if estado == 'esperando_usuario':
+        username = incoming_msg
+        try:
+            data = viaje_sheet.get_all_records()
+            user_data = next((row for row in data if row['usuario'].strip().lower() == username), None)
+            if not user_data:
+                reply = "⚠️ No encontramos tus datos. Asegurate de haber ingresado correctamente tu nombre de usuario."
+            else:
+                sesiones[from_number]['estado'] = 'menu'
+                sesiones[from_number]['usuario'] = username
+                sesiones[from_number]['user_data'] = user_data
+                reply = "✅ Usuario reconocido.\n\n" + mostrar_menu()
+        except Exception as e:
+            print(f"❌ Error accediendo al sheet: {e}")
+            reply = "❌ Error consultando tu información. Intenta más tarde."
 
-        # Buscar al usuario en la hoja
-        data = viaje_sheet.get_all_records()
-        user_row = next((row for row in data if row['usuario'].strip().lower() == username), None)
-
-        if not user_row:
-            msg.body("⚠️ No encontramos tus datos. Asegurate de haber ingresado correctamente tu usuario.")
-            return str(resp)
-
-        paquete = user_row['tipo de paquete'].strip().lower()
+    elif estado == 'menu':
+        user_data = sesiones[from_number]['user_data']
+        paquete = user_data['tipo de paquete'].strip().lower()
 
         if incoming_msg == '1':
-            hotel = user_row['hotel alojamiento']
-            hotel_data = hoteles_sheet.get_all_records()
-            hotel_info = next((h for h in hotel_data if h['Nombre'].strip().lower() == hotel.strip().lower()), None)
+            hotel = user_data['hotel alojamiento']
+            hotel_info = next((h for h in hoteles_sheet.get_all_records() if h['Nombre'].strip().lower() == hotel.strip().lower()), None)
             if hotel_info:
-                reply = (
-                    f"\U0001F3E8 *{hotel}*\n"
-                    f"\U0001F4CD Dirección: {hotel_info['Direccion']}\n"
-                    f"\U0001F6CF\uFE0F Comodidades: {hotel_info['Comodidades']}\n"
-                    f"\U0001F48E Paquete: {hotel_info['Paquete']}"
-                )
+                reply = (f"🏨 *{hotel}*\n"
+                         f"📍 Dirección: {hotel_info['Direccion']}\n"
+                         f"🛏️ Comodidades: {hotel_info['Comodidades']}\n"
+                         f"💎 Paquete: {hotel_info['Paquete']}")
             else:
-                reply = f"⚠️ No se encontró información del hotel *{hotel}*."
+                reply = f"❌ No se encontró información del hotel {hotel}."
 
         elif incoming_msg == '2':
-            reply = f"\U0001F6CF\uFE0F Tu alojamiento es en *{user_row['hotel alojamiento']}*, incluido en el paquete *{user_row['tipo de paquete']}*."
+            reply = f"🛏️ Tu alojamiento es *{user_data['hotel alojamiento']}*, incluido en el paquete *{user_data['tipo de paquete']}*."
 
         elif incoming_msg == '3':
-            reply = (
-                f"\u2708\uFE0F *Tu viaje desde {user_row['lugar salida']} a {user_row['lugar de destino']}*\n"
-                f"\U0001F4C5 Salida: {user_row['fecha salida']} a las {user_row['hora vuelo']}\n"
-                f"\U0001F4C5 Llegada: {user_row['fecha llegada']} a las {user_row['hora de llegada']}\n"
-                f"\U0001F522 Número de vuelo: {user_row['numero de vuelo']}"
-            )
+            reply = (f"✈️ *Viaje de {user_data['lugar salida']} a {user_data['lugar de destino']}*\n"
+                     f"📅 Salida: {user_data['fecha salida']} a las {user_data['hora vuelo']}\n"
+                     f"📅 Llegada: {user_data['fecha llegada']} a las {user_data['hora de llegada']}\n"
+                     f"🔢 Vuelo: {user_data['numero de vuelo']}")
 
         elif incoming_msg == '4':
             tours_data = tours_sheet.get_all_records()
             tours_filtrados = [tour for tour in tours_data if tour['paquete'].strip().lower() == paquete]
             if tours_filtrados:
-                reply = f"\U0001F9F3 Estos son tus tours incluidos en el paquete *{paquete.title()}*:\n"
+                reply = f"🧳 Estos son tus tours incluidos en el paquete *{paquete.title()}*:\n"
                 for tour in tours_filtrados:
-                    reply += f"\n\u2728 *{tour['nombre']}*\n{tour['decripcion']}\n"
+                    reply += f"\n🔹 *{tour['nombre']}*\n{tour['decripcion']}"
             else:
-                reply = "⚠️ No se encontraron tours para tu paquete."
+                reply = "❌ No se encontraron tours para tu paquete."
 
-        print(f"\u2709\uFE0F Respuesta enviada a {username}:\n{reply}\n")
-        msg.body(reply)
+        elif incoming_msg == '5':
+            reply = mostrar_menu()
 
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        msg.body("⚠️ Ocurrió un error procesando tu solicitud. Intenta más tarde.")
+        else:
+            reply = "❓ Opción inválida. Por favor escribe un número del 1 al 5."
 
+    else:
+        reply = "❌ Estado desconocido. Inicia de nuevo escribiendo cualquier mensaje."
+
+    msg.body(reply)
+    print(f"➡️ Bot: {reply}")
     return str(resp)
 
 @app.route("/", methods=["GET"])
