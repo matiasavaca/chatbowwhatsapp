@@ -83,7 +83,7 @@ def whatsapp_reply():
 
     # Ya logueado → opciones 1 a 5
     user_data = session.get('user_data')
-    paquete = user_data.get('tipo de paquete', '').strip().lower()
+    paquete = user_data.get('paquete', '').strip().lower()
     reply = ""
 
     if incoming_msg == '5':
@@ -107,7 +107,7 @@ def whatsapp_reply():
             reply = "❌ Error consultando hotel."
     elif incoming_msg == '2':
         reply = (f"🏨 Tu alojamiento es en: {user_data['hotel alojamiento']} "
-                 f"(paquete {user_data['tipo de paquete']})\n"
+                 f"(paquete {user_data['paquete']})\n"
                  f"↩️ Escribe *5* para volver al menú principal.")
     elif incoming_msg == '3':
         reply = (f"✈️ *Viaje de {user_data['lugar salida']} a {user_data['lugar de destino']}*\n"
