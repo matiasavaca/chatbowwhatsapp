@@ -129,7 +129,13 @@ def whatsapp_reply():
             msg.body("❓ Opción inválida. Por favor escribe un número del 1 al 5.")
             return str(resp)
 
-    # Si nada coincidió
+    # Fallback si está esperando username pero no lo escribió correctamente
+    if estado == 'esperando_username':
+        msg.body("👋 Welcome! Sign in with your *username* to get your trip information:")
+        sesiones[phone] = {'estado': 'esperando_username', 'timestamp': ahora}
+        return str(resp)
+
+    # Fallback general
     msg.body("👋 Welcome! Sign in with your *username* to get your trip information:")
     sesiones[phone] = {'estado': 'esperando_username', 'timestamp': ahora}
     return str(resp)
